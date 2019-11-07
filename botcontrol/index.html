@@ -1,6 +1,3 @@
-<!-- Bowie MQTT VR Control -->
-<!-- Quickly coded & cobbled together by Erin RobotGrrl -->
-
 <!DOCTYPE html>
 <html>
   <head>
@@ -10,29 +7,34 @@
     <script src="dist/aframe-v0.9.1.min.js"></script>
     <script src="dist/gradientsky.min.js"></script>
     <script src="dist/aframe-event-set-component.min.js"></script>
-    <!-- todo: download that -->
-    <script src="https://assets.shiftr.io/js/mqtt-2.9.0.js"></script>
+    <script src="mqtt/mqttws31.min.js"></script>
 
     <script>
 
-      var client = mqtt.connect('', {
-        clientId: 'webvr'
+      function cbPahoOnConnectionLost(responseObject){
+          console.log('cbPahoOnConnectionLost: ' + responseObject.errorMessage);
+      };
+      function cbPahoOnMessageArrived(msg){
+          console.log('cbPahoOnMessageArrived:  '  + msg.payloadString);
+
+      };
+      function cbPahoOnConnect(){
+          console.log('cbPahoOnConnect');
+      };
+
+      var pahoclient = new Paho.MQTT.Client('broker.shiftr.io', 443, 'SpiderBowie');
+      pahoclient.onConnectionLost = cbPahoOnConnectionLost;
+      pahoclient.onMessageArrived = cbPahoOnMessageArrived;
+
+      pahoclient.connect({
+          'userName' : 'broker-client-username',
+          'password' : 'broker-password',
+          'useSSL'   : true,
+          'onSuccess' : cbPahoOnConnect
       });
 
-      client.on('connect', function(){
-        console.log('client has connected!');
-      });
-
-      client.on('message', function(topic, message) {
-        console.log('new message:', topic, message.toString());
-      });
 
       var img_count = 0;
-      
-      //$('#button').click(function(){
-        //client.publish('/hello', 'world');
-      //})
-
 
       AFRAME.registerComponent('pulse', {
         play: function () {
@@ -40,7 +42,7 @@
           var last_change = new Date();
           //console.log("play");
           pulse();
-          
+
           function pulse () {
             //console.log("pulse");
             var index;
@@ -65,7 +67,7 @@
 
 
 
-		  AFRAME.registerComponent('handle-events', {
+      AFRAME.registerComponent('handle-events', {
         init: function () {
           var el = this.el;
           var controlbutton = el.getAttribute("id");
@@ -74,7 +76,7 @@
           var infotext_el = document.querySelector("#infotext");
           var still_there = false;
 
-					el.addEventListener('mouseenter', function () {
+	  el.addEventListener('mouseenter', function () {
           	enter_time = new Date();
           	console.log(controlbutton + " enter");
           	el.setAttribute('color', '#7fff5c');
@@ -84,11 +86,11 @@
             if(img_count == 0) setTimeout(refresh_image(), 1000);
 
           });
-          
+
           el.addEventListener('mouseleave', function () {
             leave_time = new Date();
             console.log(controlbutton + " leave");
-            
+
             /*
             var time_diff = Math.abs(leave_time.getTime() - enter_time.getTime());
             console.log("time difference = " + time_diff)
@@ -105,7 +107,7 @@
             */
             //el.setAttribute('color', '#EF2D5E');  
           });
-          
+
           el.addEventListener('click', function () {
             console.log(controlbutton + " click");
             //el.setAttribute('scale', {x: 2, y: 1, z: 2});
@@ -160,12 +162,19 @@
         control_bowie_drive(0, 0, 0, 0);
       }
 
+      function send_paho_msg_to_topic(topic, msg_string) {
+          pahomsg = new Paho.MQTT.Message(msg_string);
+          pahomsg.destinationName = topic;
+          pahoclient.send(pahomsg);
+      }
+
       function control_bowie_drive(motor_a_dir, motor_a_speed, motor_b_dir, motor_b_speed) {
         console.log("control_bowie_drive");
-        client.publish('/control/motors/motor_a_dir', String(motor_a_dir));
-        client.publish('/control/motors/motor_a_speed', String(motor_a_speed));
-        client.publish('/control/motors/motor_b_dir', String(motor_b_dir));
-        client.publish('/control/motors/motor_b_speed', String(motor_b_speed));
+
+        send_paho_msg_to_topic('/control/motors/motor_a_dir', String(motor_a_dir));
+        send_paho_msg_to_topic('/control/motors/motor_a_speed', String(motor_a_speed));
+        send_paho_msg_to_topic('/control/motors/motor_b_dir', String(motor_b_dir));
+        send_paho_msg_to_topic('/control/motors/motor_b_speed', String(motor_b_speed));
       }
 
       function testfunc() {
@@ -231,7 +240,6 @@
 	        	id="infotext" position="0.5 -0.75 -1" visible="false"></a-entity>
 	      </a-entity>
     	</a-entity>
-
 
     </a-scene>
   </body>
