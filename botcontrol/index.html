@@ -1,0 +1,244 @@
+<!-- Bowie MQTT VR Control -->
+<!-- Quickly coded & cobbled together by Erin RobotGrrl -->
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Bot Control</title>
+    <!-- <meta name="description" content="Models (glTF, OBJ) - A-Frame"> -->
+    <script src="dist/aframe-v0.9.1.min.js"></script>
+    <script src="dist/gradientsky.min.js"></script>
+    <script src="dist/aframe-event-set-component.min.js"></script>
+    <!-- todo: download that -->
+    <script src="https://assets.shiftr.io/js/mqtt-2.9.0.js"></script>
+
+    <script>
+
+      var client = mqtt.connect('', {
+        clientId: 'webvr'
+      });
+
+      client.on('connect', function(){
+        console.log('client has connected!');
+      });
+
+      client.on('message', function(topic, message) {
+        console.log('new message:', topic, message.toString());
+      });
+
+      var img_count = 0;
+      
+      //$('#button').click(function(){
+        //client.publish('/hello', 'world');
+      //})
+
+
+      AFRAME.registerComponent('pulse', {
+        play: function () {
+          //var boxEls = document.querySelectorAll('[mixin~="box"]');
+          var last_change = new Date();
+          //console.log("play");
+          pulse();
+          
+          function pulse () {
+            //console.log("pulse");
+            var index;
+            var loop;
+            var current_time = new Date();
+            var time_diff = Math.abs(current_time.getTime() - last_change.getTime());
+
+            if(time_diff >= 1000) {
+              refresh_image();
+              last_change = new Date();
+            }
+
+            requestAnimationFrame(pulse);
+            index = 0;
+            loop = setInterval(function loopPulse () {
+              // console.log("loop");
+              document.querySelector('#groundcam').emit('pulse')
+            }, 5000);
+          }
+        }
+      });
+
+
+
+		  AFRAME.registerComponent('handle-events', {
+        init: function () {
+          var el = this.el;
+          var controlbutton = el.getAttribute("id");
+          var enter_time;
+          var leave_time;
+          var infotext_el = document.querySelector("#infotext");
+          var still_there = false;
+
+					el.addEventListener('mouseenter', function () {
+          	enter_time = new Date();
+          	console.log(controlbutton + " enter");
+          	el.setAttribute('color', '#7fff5c');
+            still_there = true;
+            setTimeout(gofunc(controlbutton), 100);
+
+            if(img_count == 0) setTimeout(refresh_image(), 1000);
+
+          });
+          
+          el.addEventListener('mouseleave', function () {
+            leave_time = new Date();
+            console.log(controlbutton + " leave");
+            
+            /*
+            var time_diff = Math.abs(leave_time.getTime() - enter_time.getTime());
+            console.log("time difference = " + time_diff)
+            */
+
+            el.setAttribute('color', '#FF926B');
+            still_there = false;
+            setTimeout(stopfunc(controlbutton), 100);
+
+            /*
+            infotext_el.setAttribute("text", {value: " " + controlbuttonName(controlbutton) + " = " + time_diff/1000 + "s"});
+            infotext_el.setAttribute("visible", true);
+            setTimeout(testfunc, 3000);
+            */
+            //el.setAttribute('color', '#EF2D5E');  
+          });
+          
+          el.addEventListener('click', function () {
+            console.log(controlbutton + " click");
+            //el.setAttribute('scale', {x: 2, y: 1, z: 2});
+          });
+
+        }
+
+      });
+
+      function refresh_image() {
+        console.log("refreshing image");
+        document.querySelector('#groundcam').setAttribute('src', "../botimages/image.jpg?a="+Math.random());
+
+        /*
+        if(img_count%2 == 0) {
+          //document.querySelector('#groundcam').setAttribute('src', "images/sunflowers.jpg");
+          document.querySelector('#groundcam').setAttribute('src', "../images/image.jpg");
+        } else {
+          document.querySelector('#groundcam').setAttribute('src', "images/frogs.jpg");
+        }
+        img_count++;
+        */
+
+      }
+
+      function gofunc(el_id) {
+        console.log("this is the gofunc " + el_id);
+
+        switch(el_id) {
+          case "forward":
+            control_bowie_drive(0, 255, 0, 255); // yes it's backwards
+            readable_name = "Forward";
+          break;
+          case "left":
+            control_bowie_drive(1, 255, 0, 255);
+            readable_name = "Left";
+          break;
+          case "right":
+            control_bowie_drive(0, 255, 1, 255);
+            readable_name = "Right";
+          break;
+          case "backward":
+            control_bowie_drive(1, 255, 1, 255); // yes it's backwards
+            readable_name = "Backward";
+          break;
+        }
+
+      }
+
+      function stopfunc(el_id) {
+        console.log("this is the stopfunc " + el_id);
+        control_bowie_drive(0, 0, 0, 0);
+      }
+
+      function control_bowie_drive(motor_a_dir, motor_a_speed, motor_b_dir, motor_b_speed) {
+        console.log("control_bowie_drive");
+        client.publish('/control/motors/motor_a_dir', String(motor_a_dir));
+        client.publish('/control/motors/motor_a_speed', String(motor_a_speed));
+        client.publish('/control/motors/motor_b_dir', String(motor_b_dir));
+        client.publish('/control/motors/motor_b_speed', String(motor_b_speed));
+      }
+
+      function testfunc() {
+      	var infotext_el = document.querySelector("#infotext");
+    		infotext_el.setAttribute("visible",false);
+    	}
+
+      function controlbuttonName(el_id) {
+        var readable_name = "None"
+        switch(el_id) {
+          case "forward":
+            readable_name = "Forward";
+          break;
+          case "left":
+            readable_name = "Left";
+          break;
+          case "right":
+            readable_name = "Right";
+          break;
+          case "backward":
+            readable_name = "Backward";
+          break;
+        }
+        return readable_name;
+      }
+
+		</script>
+
+  </head>
+  <body>
+
+    <!-- remember to remove stats -->
+    <a-scene background="color: #FAFAFA" renderer="colorManagement: true;">
+      <a-sky src="images/westboro_beach.jpg" rotation="0 -140 -9.5"></a-sky>
+
+      <a-assets>
+        <!-- <img id="ground-cam" src="images/ground_cam_0699_09-54-41-556279.jpg"> -->
+      </a-assets>
+
+
+      <a-icosahedron color="#FF926B" radius="1" position="0 17 -10" id="forward" handle-events></a-icosahedron>
+      <a-icosahedron color="#FF926B" radius="1" position="-2 15 -10" id="left" handle-events></a-icosahedron>
+      <a-icosahedron color="#FF926B" radius="1" position="2 15 -10" id="right" handle-events></a-icosahedron>
+      <a-icosahedron color="#FF926B" radius="1" position="0 13 -10" id="backward" handle-events></a-icosahedron>
+
+
+      <a-curvedimage id="groundcam" src="images/ground_cam_0699_09-54-41-556279.jpg" height="20.0" radius="30" theta-length="72"
+                 rotation="0 140 0" scale="1.2 1.2 1.2" position="-2.8 19 9" material="opacity: 0.8; transparent: true" crossorigin="anonymous" pulse></a-curvedimage>
+
+
+      <!-- <a-plane rotation="-90 0 0" width="4" height="4" color="white"></a-plane> -->
+      <!-- <a-sky material="shader: gradient; topColor: 248 251 255; bottomColor: 102 107 113;"></a-sky>
+      <a-entity light="type:directional; castShadow:true; intensity:1.6;" position="0 3.195 2.2"></a-entity>
+ -->
+
+      <a-entity rig position="0 3.5 0">
+        <a-entity camera look-controls wasd-controls position="0 3.5 0">
+	        <a-entity cursor
+	                  geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.016"
+	                  material="color: #EEE"
+	                  position="0 0 -1"></a-entity>
+	        <a-entity text="value: word; color: black; width: 2;" 
+	        	id="infotext" position="0.5 -0.75 -1" visible="false"></a-entity>
+	      </a-entity>
+    	</a-entity>
+
+
+    </a-scene>
+  </body>
+</html>
+
+
+
+
+
+
